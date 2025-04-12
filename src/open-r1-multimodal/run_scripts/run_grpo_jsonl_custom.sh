@@ -15,7 +15,7 @@ torchrun --nproc_per_node="2" \
   src/open_r1/grpo_jsonl.py \
     --output_dir output/test \
     --model_name_or_path Qwen/Qwen2.5-VL-3B-Instruct \
-    --deepspeed local_scripts/zero2.json \
+    --deepspeed local_scripts/zero3_custom.json \
     --dataset_name tally_qa \
     --data_file_paths /home/ezzeng/stat946/stat946_final_proj/data/train_qas.jsonl \
     --image_folders /home/ezzeng/stat946/stat946_final_proj/data \
@@ -39,4 +39,4 @@ torchrun --nproc_per_node="2" \
     --lora_alpha 128 \
     --lora_dropout 0.05 \
     --lora_task_type CAUSAL_LM \
-    --freeze_vision_modules true
+    --freeze_vision_modules true 
