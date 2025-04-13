@@ -978,7 +978,11 @@ def main(script_args, training_args, model_args):
                 # Handle solution that could be a float or string
                 solution_value = item['conversations'][1]['value']
                 if isinstance(solution_value, str):
-                    item['solution'] = solution_value.replace('<answer>', '').replace('</answer>', '').strip()
+                    if "<think>" in solution_value:
+                        # Preserve the original format with think and answer tags
+                        item['solution'] = solution_value
+                    else:
+                        item['solution'] = solution_value.replace('<answer>', '').replace('</answer>', '').strip()
                 else:
                     # If it's a float or other non-string type, keep it as is
                     item['solution'] = str(solution_value)
@@ -995,7 +999,7 @@ def main(script_args, training_args, model_args):
             return {
                 'image_path': [p for p in example['image_path']],  # Store path instead of loaded image
                 'problem': example['problem'],
-                'solution': f"<answer> {example['solution']} </answer>",
+                'solution': f"<answer> {example['solution']} </answer>" if "<think>" not in example['solution'] else example['solution'],
                 'accu_reward_method': example['accu_reward_method'],
                 'prompt': [{
                     'role': 'user',
@@ -1008,7 +1012,7 @@ def main(script_args, training_args, model_args):
         else:
             return {
                 'problem': example['problem'],
-                'solution': f"<answer> {example['solution']} </answer>",
+                'solution': f"<answer> {example['solution']} </answer>" if "<think>" not in example['solution'] else example['solution'],
                 'accu_reward_method': example['accu_reward_method'],
                 'prompt': [{
                     'role': 'user',
