@@ -69,6 +69,10 @@ class GRPOScriptArguments(ScriptArguments):
     """
     Script arguments for the GRPO training script.
     """
+    question_task_template: str = field(
+        default="default",
+        metadata={"help": "Question task template. Possible values: 'default', 'count'"},
+    )
     data_file_paths: str = field(
         default=None,
         metadata={"help": "Paths to data files, separated by ':'"},
@@ -916,8 +920,18 @@ def main(script_args, training_args, model_args):
     # Load the VLM module
     vlm_module_cls = get_vlm_module(model_args.model_name_or_path)
     print("using vlm module:", vlm_module_cls.__name__)
-    question_prompt = vlm_module_cls.get_question_template(task_type="default")
-
+    question_prompt = vlm_module_cls.get_question_template(task_type=script_args.question_task_template)
+    
+    # Log the question template for debugging
+    if os.getenv("DEBUG_MODE") == "true":
+        log_path = os.getenv("LOG_PATH")
+        current_time = datetime.now().strftime("%d-%H-%M-%S-%f")
+        with open(log_path + "_template.txt", "a", encoding='utf-8') as f:
+            f.write(f"------------- {current_time} Question Template -------------\n")
+            f.write(f"task_type: {script_args.question_task_template}\n")
+            f.write(f"vlm_module: {vlm_module_cls.__name__}\n")
+            f.write(f"question_prompt: {question_prompt}\n\n")
+    
     # Get reward functions
     reward_funcs = [reward_funcs_registry[func] for func in script_args.reward_funcs]
     print("reward_funcs:", reward_funcs)

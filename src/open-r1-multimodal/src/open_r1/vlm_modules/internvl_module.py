@@ -133,6 +133,8 @@ class InvernVLModule(VLMBaseModule):
     @staticmethod
     def get_question_template(task_type: str):
         match task_type:
+            case "count":
+                return "{Question} First output the thinking process in <think> </think> tags and then output the final answer in <answer> </answer> tags. When thinking, on each line, list a object that you spot as well as its <x, y> coordinate. The final answer should be a number. For example, <think>I spot a person at <404, 104>.\nI spot a person at <480, 188>.\nTherefore, I see 2 people.</think><answer>2</answer>"
             case _:
                 return "{Question} First output the thinking process in <think> </think> tags and then output the final answer in <answer> </answer> tags."
     
