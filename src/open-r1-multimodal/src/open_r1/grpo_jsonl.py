@@ -35,6 +35,7 @@ import math
 from json_repair import repair_json
 
 from open_r1.vlm_modules import *
+from open_r1.counting_rewards import COUNTING_REWARD_FUNCS
 
 from transformers.models.qwen2_5_vl.modeling_qwen2_5_vl import Qwen2_5_VLVisionFlashAttention2, apply_rotary_pos_emb_flashatt, flash_attn_varlen_func
 import torch
@@ -895,6 +896,7 @@ reward_funcs_registry = {
     "length": cosine_rewards,
     "repetition": repetition_rewards,
 }
+reward_funcs_registry.update(COUNTING_REWARD_FUNCS)
 
 @dataclass
 class GRPOModelConfig(ModelConfig):
@@ -926,6 +928,8 @@ def main(script_args, training_args, model_args):
     if os.getenv("DEBUG_MODE") == "true":
         log_path = os.getenv("LOG_PATH")
         current_time = datetime.now().strftime("%d-%H-%M-%S-%f")
+        if not os.path.exists(training_args.output_dir):
+            os.makedirs(training_args.output_dir)
         with open(log_path + "_template.txt", "a", encoding='utf-8') as f:
             f.write(f"------------- {current_time} Question Template -------------\n")
             f.write(f"task_type: {script_args.question_task_template}\n")
