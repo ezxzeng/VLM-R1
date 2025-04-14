@@ -53,7 +53,7 @@ client = OpenAI(
 )
 
 from open_r1.qwen2_5vl_monkey_patch import monkey_patch_qwen2_5vl_flash_attn, monkey_patch_qwen2_5vl_forward
-monkey_patch_qwen2_5vl_flash_attn()    
+monkey_patch_qwen2_5vl_flash_attn()
 
 
 
@@ -178,7 +178,7 @@ def evaluate_answer_similarity(student_answer, ground_truth):
         )
         result = response.choices[0].message.content.strip()
         return float(result)
-    
+
     except Exception as e:
         print(f"Error in GPT evaluation: {e}")
         # If API call fails, fall back to simple text matching
@@ -188,7 +188,7 @@ def llm_reward(content, sol, **kwargs):
     # Extract answer from content if it has think/answer tags
     sol_match = re.search(r'<answer>(.*?)</answer>', sol)
     ground_truth = sol_match.group(1).strip() if sol_match else sol.strip()
-    
+
     # Extract answer from content if it has think/answer tags
     content_matches = re.findall(r'<answer>(.*?)</answer>', content, re.DOTALL)
     student_answer = content_matches[-1].strip() if content_matches else content.strip()
@@ -259,7 +259,7 @@ def calculate_map(pred_bbox_list, gt_bbox_list, score_type=0):
                 "name": gt_bbox["label"]
             })
             cat_count += 1
-        
+
         gt_json["annotations"].append({
             "id": idx+1,
             "image_id": 0,
@@ -282,10 +282,10 @@ def calculate_map(pred_bbox_list, gt_bbox_list, score_type=0):
             })
         except:
             pass
-    
+
     if len(dt_json) == 0:
         return 0.0
-    
+
     coco_dt = coco_gt.loadRes(dt_json)
     coco_eval = COCOeval(coco_gt, coco_dt, "bbox")
 
@@ -297,14 +297,14 @@ def calculate_map(pred_bbox_list, gt_bbox_list, score_type=0):
 def map_reward(content, sol, length_reward=False, score_type=0, **kwargs):
     """
     Calculate mean average precision (mAP) reward between predicted and ground truth bounding boxes.
-    
+
     Args:
         content (str): String containing predicted bounding boxes in JSON format
         sol (str): String containing ground truth bounding boxes in JSON format
         length_reward (bool, optional): Whether to include length penalty in reward calculation. Defaults to False.
         score_type (int, optional): Type of COCO evaluation metric to use. Defaults to 0 (mAP).
         **kwargs: Additional keyword arguments
-        
+
     Returns:
         float: mAP reward score between 0 and 1. If length_reward is True, the score is multiplied by a length penalty factor.
     """
@@ -318,7 +318,7 @@ def map_reward(content, sol, length_reward=False, score_type=0, **kwargs):
     if bbox_json:
         bbox_data = json.loads(bbox_json)
         gt_bbox_list = [item for item in bbox_data]
-    
+
     # Parse predicted JSON to get bbox list
     pred_bbox_list = []
     json_match = re.findall(pattern, content, re.DOTALL)
@@ -337,7 +337,7 @@ def map_reward(content, sol, length_reward=False, score_type=0, **kwargs):
         bbox_reward = 1.0
     else:
         bbox_reward = 0.0
-    
+
     if length_reward:
         # Calculate length penalty based on ratio of ground truth to predicted bounding boxes
         gt_length = len(gt_bbox_list)
@@ -351,13 +351,13 @@ def map_reward(content, sol, length_reward=False, score_type=0, **kwargs):
 def od_reward(content, sol, score_type=0, **kwargs):
     """
     Calculate reward for object detection task by comparing predicted and ground truth answers.
-    
+
     Args:
         content (str): Model's predicted answer containing bounding box annotations
-        sol (str): Ground truth answer containing bounding box annotations 
+        sol (str): Ground truth answer containing bounding box annotations
         score_type (int): Type of COCO evaluation metric to use (default: 0 for mAP)
         **kwargs: Additional keyword arguments
-        
+
     Returns:
         float: Reward score between 0 and 1 based on mAP between predicted and ground truth boxes
     """
@@ -385,12 +385,12 @@ def od_reward(content, sol, score_type=0, **kwargs):
 def odLength_reward(content, sol, **kwargs):
     """
     Calculate reward for object detection task with length penalty.
-    
+
     Args:
         content (str): Model's predicted answer containing bounding box annotations
         sol (str): Ground truth answer containing bounding box annotations
         **kwargs: Additional keyword arguments
-        
+
     Returns:
         float: Reward score between 0 and 1 based on mAP and length penalty
     """
@@ -453,7 +453,7 @@ def detection_score(content, sol, iou_threshold=0.5, alpha=0.7, beta=0.0, gamma=
 
     """
     Calculate the comprehensive score for object detection
-    
+
     Parameters:
         pred_boxes: List of predicted boxes, each element is in the format {"bbox_2d": [x1, y1, x2, y2], "label": "category name"}
         gt_boxes: List of ground truth boxes, each element is in the format {"bbox_2d": [x1, y1, x2, y2], "label": "category name"}
@@ -461,22 +461,22 @@ def detection_score(content, sol, iou_threshold=0.5, alpha=0.7, beta=0.0, gamma=
         alpha: Position accuracy weight, default is 0.7
         beta: Label accuracy weight, default is 0.0
         gamma: Completeness weight (penalty for missed/false detections), default is 0.3
-        
+
     Returns:
         Comprehensive score, ranging from [0.0, 1.0]
     """
     # Handle edge cases
     if len(gt_boxes) == 0:
         return 1.0 if not pred_boxes else 0.0
-    
+
     if len(pred_boxes) == 0:
         return 0.0
-    
+
     # Initialize matching results
     matches = []  # Store matched pairs of predicted and ground truth boxes
     unmatched_preds = list(range(len(pred_boxes)))  # Indices of unmatched predicted boxes
     unmatched_gts = list(range(len(gt_boxes)))  # Indices of unmatched ground truth boxes
-    
+
     # Calculate IoU matrix between all predicted and ground truth boxes
     iou_matrix = []
     for pred_idx, pred_box in enumerate(pred_boxes):
@@ -488,14 +488,14 @@ def detection_score(content, sol, iou_threshold=0.5, alpha=0.7, beta=0.0, gamma=
                 curr_iou = 0.0
             iou_row.append(curr_iou)
         iou_matrix.append(iou_row)
-    
+
     # Greedy matching: find the best match for each predicted box
     while unmatched_preds and unmatched_gts:
         # Find the maximum IoU
         max_iou = -1
         max_pred_idx = -1
         max_gt_idx = -1
-        
+
         for pred_idx in unmatched_preds:
             for gt_idx in unmatched_gts:
                 curr_iou = iou_matrix[pred_idx][gt_idx]
@@ -503,11 +503,11 @@ def detection_score(content, sol, iou_threshold=0.5, alpha=0.7, beta=0.0, gamma=
                     max_iou = curr_iou
                     max_pred_idx = pred_idx
                     max_gt_idx = gt_idx
-        
+
         # Stop matching if the maximum IoU is below the threshold
         if max_iou < iou_threshold:
             break
-        
+
         # Record matching results
         try:
             pred_label = pred_boxes[max_pred_idx]["label"].lower()
@@ -518,7 +518,7 @@ def detection_score(content, sol, iou_threshold=0.5, alpha=0.7, beta=0.0, gamma=
         except:
             gt_label = ""
         label_correct = (pred_label == gt_label)
-        
+
         if label_correct:
             matches.append({
                 "pred_idx": max_pred_idx,
@@ -533,30 +533,30 @@ def detection_score(content, sol, iou_threshold=0.5, alpha=0.7, beta=0.0, gamma=
                 "iou": 0,
                 "label_correct": label_correct
             })
-        
+
         # Remove matched boxes from the unmatched list
         unmatched_preds.remove(max_pred_idx)
         unmatched_gts.remove(max_gt_idx)
-    
+
     # Calculate position accuracy score (average IoU)
     position_score = sum(m["iou"] for m in matches) / len(gt_boxes) if matches else 0.0
-    
+
     # Calculate label accuracy score
     label_score = sum(1.0 for m in matches if m["label_correct"]) / len(gt_boxes) if matches else 0.0
-    
+
     # Calculate completeness score (considering missed and false detections)
     # Miss rate = number of unmatched ground truth boxes / total number of ground truth boxes
     # False alarm rate = number of unmatched predicted boxes / total number of predicted boxes
     miss_rate = len(unmatched_gts) / len(gt_boxes)
     false_alarm_rate = len(unmatched_preds) / len(pred_boxes) if pred_boxes else 0.0
-    
+
     # Completeness score = 1 - (miss rate + false alarm rate) / 2
     completeness_score = 1.0 - (miss_rate + false_alarm_rate) / 2.0
-    
+
     # Calculate the final comprehensive score
     final_score = (
-        alpha * position_score + 
-        beta * label_score + 
+        alpha * position_score +
+        beta * label_score +
         gamma * completeness_score
     ) / (alpha + beta + gamma)
 
@@ -572,11 +572,11 @@ def cosine_reward(content, tokenizer, acc_reward, **kwargs):
 
     # processing_class = AutoProcessor.from_pretrained(model_path)
     # tokenizer = processing_class.tokenizer
-    
+
     gen_len = len(tokenizer.encode(content))
     acc_reward = 1.0
     is_correct = acc_reward >= 0.7
-    
+
     if is_correct:
         # Swap min/max for correct answers
         min_value = max_len_value_correct
@@ -598,7 +598,7 @@ def repetition_reward(content, **kwargs):
     # First, try to extract explicitly marked JSON sections
     pattern = r'```json(.*?)```'
     json_match = re.search(pattern, content, re.DOTALL)
-    
+
     if json_match:
         bbox_json = json_match.group(1).strip()
     else:
@@ -606,13 +606,13 @@ def repetition_reward(content, **kwargs):
         pattern = r'```(.*?)```'
         json_match = re.search(pattern, content, re.DOTALL)
         bbox_json = json_match.group(1).strip() if json_match else None
-        
+
         # If still not found, try to find possible JSON array sections
         if not bbox_json:
             pattern = r'\[\s*{.*?"bbox_2d".*?"label".*?}\s*\]'
             json_match = re.search(pattern, content, re.DOTALL)
             bbox_json = json_match.group(0) if json_match else None
-    
+
     # Try to parse JSON data
     if bbox_json:
         try:
@@ -636,11 +636,11 @@ def repetition_reward(content, **kwargs):
                 for item in data:
                     if 'bbox_2d' in item and 'label' in item:
                         items.append(f"{item['bbox_2d']}_{item['label']}")
-                
+
                 @staticmethod
                 def zipngram(text: list, ngram_size: int):
                     return zip(*[text[i:] for i in range(ngram_size)])
-                
+
                 ngrams = set()
                 total = 0
 
@@ -658,18 +658,18 @@ def repetition_reward(content, **kwargs):
             except KeyError:
                 # If necessary keys are missing, switch to plain text processing
                 pass
-    
+
     # If no JSON section is found or JSON processing fails, treat as plain text
     ngram_size = 6
-    
+
     if len(content.split()) < ngram_size:
         return 0.0
-    
+
     @staticmethod
     def zipngram(text: str, ngram_size: int):
         words = text.lower().split()
         return zip(*[words[i:] for i in range(ngram_size)])
-    
+
     ngrams = set()
     total = 0
 
@@ -703,7 +703,7 @@ def repetition_rewards(completions, solution, **kwargs):
                     f.write(f"image_path: {image_path}\n")
                     f.write(f"problem: {problem}\n")
                     f.write(f"Content: {content}\n")
-                    f.write(f"Solution: {sol}\n")     
+                    f.write(f"Solution: {sol}\n")
 
 
 
@@ -738,7 +738,7 @@ def cosine_rewards(completions, solution, **kwargs):
                     f.write(f"image_path: {image_path}\n")
                     f.write(f"problem: {problem}\n")
                     f.write(f"Content: {content}\n")
-                    f.write(f"Solution: {sol}\n")   
+                    f.write(f"Solution: {sol}\n")
 
     return rewards
 
@@ -760,7 +760,7 @@ def clean_text(text, exclue_chars=['\n', '\r']):
     if answer_matches:
         # Use the last match
         text = answer_matches[-1]
-    
+
     for char in exclue_chars:
         if char in ['\n', '\r']:
             # If there is a space before the newline, remove the newline
@@ -769,7 +769,7 @@ def clean_text(text, exclue_chars=['\n', '\r']):
             text = re.sub(r'(?<!\s)' + re.escape(char), ' ', text)
         else:
             text = text.replace(char, ' ')
-    
+
     # Remove leading and trailing spaces and convert to lowercase
     return text.strip().rstrip('.').lower()
 
@@ -778,11 +778,11 @@ def default_accuracy_reward(content, sol, **kwargs):
         # Extract answer from solution if it has think/answer tags
     sol_match = re.search(r'<answer>(.*?)</answer>', sol)
     ground_truth = sol_match.group(1).strip() if sol_match else sol.strip()
-    
+
     # Extract answer from content if it has think/answer tags
     content_matches = re.findall(r'<answer>(.*?)</answer>', content, re.DOTALL)
     student_answer = content_matches[-1].strip() if content_matches else content.strip()
-    
+
     # Try symbolic verification first for numeric answers
     try:
         answer = parse(student_answer)
@@ -793,12 +793,12 @@ def default_accuracy_reward(content, sol, **kwargs):
 
     # If symbolic verification failed, try string matching or fuzzy matching
     if reward == 0.0:
-        try: 
+        try:
             # Check if ground truth contains numbers
             has_numbers = bool(re.search(r'\d', ground_truth))
             # Check if it's a multiple choice question
             has_choices = extract_choice(ground_truth)
-            
+
             if has_numbers:
                 # For numeric answers, use exact matching
                 reward = numeric_reward(student_answer, ground_truth)
@@ -851,9 +851,9 @@ def accuracy_reward(completions, solution, **kwargs):
         elif accu_reward_method == 'odLength':
             reward = odLength_reward(content, sol)
         else:
-            reward = default_accuracy_reward(content, sol)  
+            reward = default_accuracy_reward(content, sol)
         rewards.append(reward)
-        
+
         if os.getenv("DEBUG_MODE") == "true":
             log_path = os.getenv("LOG_PATH")
             current_time = datetime.now().strftime("%d-%H-%M-%S-%f")
@@ -866,9 +866,9 @@ def accuracy_reward(completions, solution, **kwargs):
                     f.write(f"image_path: {image_path}\n")
                     f.write(f"problem: {problem}\n")
                     f.write(f"Content: {content}\n")
-                    f.write(f"Solution: {sol}\n")     
+                    f.write(f"Solution: {sol}\n")
 
-        
+
     return rewards
 
 
@@ -923,7 +923,7 @@ def main(script_args, training_args, model_args):
     vlm_module_cls = get_vlm_module(model_args.model_name_or_path)
     print("using vlm module:", vlm_module_cls.__name__)
     question_prompt = vlm_module_cls.get_question_template(task_type=script_args.question_task_template)
-    
+
     # Log the question template for debugging
     if os.getenv("DEBUG_MODE") == "true":
         log_path = os.getenv("LOG_PATH")
@@ -935,7 +935,7 @@ def main(script_args, training_args, model_args):
             f.write(f"task_type: {script_args.question_task_template}\n")
             f.write(f"vlm_module: {vlm_module_cls.__name__}\n")
             f.write(f"question_prompt: {question_prompt}\n\n")
-    
+
     # Get reward functions
     reward_funcs = [reward_funcs_registry[func] for func in script_args.reward_funcs]
     print("reward_funcs:", reward_funcs)
@@ -943,23 +943,23 @@ def main(script_args, training_args, model_args):
     # Load the JSONL datasets
     import json
     from datasets import Dataset
-    
+
     data_files = script_args.data_file_paths.split(":")
     image_folders = script_args.image_folders.split(":")
-    
+
     if len(data_files) != len(image_folders):
         raise ValueError("Number of data files must match number of image folders")
-    
+
     if script_args.reward_method is None:
         accu_reward_methods = ["default"] * len(data_files)
     else:
         accu_reward_methods = script_args.reward_method.split(":")
         assert len(accu_reward_methods) == len(data_files), f"Number of reward methods must match number of data files: {len(accu_reward_methods)} != {len(data_files)}"
 
-    
+
     if len(data_files) != len(image_folders):
         raise ValueError("Number of data files must match number of image folders")
-    
+
     all_data = []
     for data_file, image_folder, accu_reward_method in zip(data_files, image_folders, accu_reward_methods):
         with open(data_file, 'r') as f:
@@ -978,7 +978,7 @@ def main(script_args, training_args, model_args):
                         raise ValueError(f"Unsupported image type: {type(item['image'])}")
                 # Remove immediate image loading
                 item['problem'] = item['conversations'][0]['value'].replace('<image>', '')
-                
+
                 # Handle solution that could be a float or string
                 solution_value = item['conversations'][1]['value']
                 if isinstance(solution_value, str):
@@ -990,7 +990,7 @@ def main(script_args, training_args, model_args):
                 else:
                     # If it's a float or other non-string type, keep it as is
                     item['solution'] = str(solution_value)
-                
+
                 del item['conversations']
                 item['accu_reward_method'] = item.get('accu_reward_method', accu_reward_method) # if accu_reward_method is in the data jsonl, use the value in the data jsonl, otherwise use the defined value
                 all_data.append(item)

@@ -1,11 +1,26 @@
 cd src/open-r1-multimodal
 
+
+# in host 'narval'
+if [[ $(hostname) == *"narval"* ]]; then
+  # Loading the required modules
+  module --force purge && module load StdEnv/2023 gcc opencv/4.10.0 python/3.10.13 rust/1.85.0 arrow/18.1.0 cuda/12.6 && source ~/.venvs/vlm-r1/bin/activate
+
+  # Setting offline mode
+  export TRANSFORMERS_OFFLINE=1
+  export HF_HUB_OFFLINE=1
+  export WANDB_MODE=offline
+fi
+
+
 export DEBUG_MODE="true"
+
 export RUN_NAME="Qwen2.5-VL-3B-GRPO-TALLY-lora-count-many-examples-question-last-cntFormR-pointsR-pointAccR-cntConsR-cntAccR"
 export LOG_PATH="output/$RUN_NAME/debug_log.txt"
-export TORCH_DYNAMO=0
-export CUDA_VISIBLE_DEVICES="1,2"
-
+if [[ $(hostname) != *"narval"* ]]; then
+  export TORCH_DYNAMO=0
+  export CUDA_VISIBLE_DEVICES="1,2"
+fi
 
 torchrun --nproc_per_node="2" \
     --nnodes="1" \
