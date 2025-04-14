@@ -1,7 +1,7 @@
 cd src/open-r1-multimodal
 
 export DEBUG_MODE="true"
-export RUN_NAME="Qwen2.5-VL-7B-GRPO-TALLY-lora-count"
+export RUN_NAME="Qwen2.5-VL-3B-GRPO-TALLY-lora-count"
 export LOG_PATH="output/$RUN_NAME/debug_log_$RUN_NAME.txt"
 export TORCH_DYNAMO=0
 export CUDA_VISIBLE_DEVICES="1,2"
