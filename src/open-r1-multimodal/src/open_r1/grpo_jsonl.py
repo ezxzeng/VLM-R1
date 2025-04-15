@@ -956,10 +956,6 @@ def main(script_args, training_args, model_args):
         accu_reward_methods = script_args.reward_method.split(":")
         assert len(accu_reward_methods) == len(data_files), f"Number of reward methods must match number of data files: {len(accu_reward_methods)} != {len(data_files)}"
 
-
-    if len(data_files) != len(image_folders):
-        raise ValueError("Number of data files must match number of image folders")
-
     all_data = []
     for data_file, image_folder, accu_reward_method in zip(data_files, image_folders, accu_reward_methods):
         with open(data_file, 'r') as f:
