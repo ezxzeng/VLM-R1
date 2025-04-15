@@ -1360,10 +1360,24 @@ def main(script_args, training_args, model_args):
     if grpo_peft_config:
         print(f"GRPO PEFT config: {grpo_peft_config}")
 
+    # Create completely new training args for GRPO without DeepSpeed
+    grpo_args_dict = training_args.to_dict()
+
+    # Remove DeepSpeed configuration
+    if "deepspeed" in grpo_args_dict:
+        del grpo_args_dict["deepspeed"]
+    if "deepspeed_config" in grpo_args_dict:
+        del grpo_args_dict["deepspeed_config"]
+
+    # Create new GRPOConfig without DeepSpeed
+    grpo_training_args = GRPOConfig(**grpo_args_dict)
+    print("Created new GRPO training args without DeepSpeed")
+
+    # Pass the modified training args to the trainer
     trainer = trainer_cls(
         model=model_args.model_name_or_path,
         reward_funcs=reward_funcs,
-        args=training_args,
+        args=grpo_training_args,
         vlm_module=vlm_module_cls(),
         processing_class=processor,
         train_dataset=grpo_dataset['train'],
