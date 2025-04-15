@@ -21,17 +21,18 @@ from typing import Optional
 from babel.numbers import parse_decimal
 from open_r1.utils.math import compute_score
 from datasets import load_dataset, load_from_disk, Dataset
-from transformers import Qwen2VLForConditionalGeneration
+from transformers import Qwen2VLForConditionalGeneration, Qwen2_5_VLForConditionalGeneration
 
 from math_verify import parse, verify
 from open_r1.trainer import VLMGRPOTrainer, GRPOConfig
-from trl import ModelConfig, ScriptArguments, TrlParser, get_peft_config
+from trl import ModelConfig, ScriptArguments, TrlParser, get_peft_config, SFTTrainer, SFTConfig
 import PIL
 from Levenshtein import ratio
 from open_r1.utils.pycocotools.coco import COCO
 from open_r1.utils.pycocotools.cocoeval import COCOeval
 import json
 import math
+import copy
 from json_repair import repair_json
 
 from open_r1.vlm_modules import *
@@ -42,6 +43,7 @@ import torch
 from typing import Tuple
 from transformers.utils import logging
 from transformers import AutoProcessor, AutoTokenizer
+from transformers.trainer_utils import get_last_checkpoint
 
 from openai import OpenAI
 
@@ -956,7 +958,128 @@ def get_vlm_module(model_name_or_path):
     else:
         raise ValueError(f"Unsupported model: {model_name_or_path}")
 
+
+class LazySupervisedDataset(torch.utils.data.Dataset):
+    """
+    Dataset for supervised fine-tuning that lazily loads and processes examples.
+    This implementation is aligned with TRL's approach to handling datasets.
+    """
+    def __init__(self, dataset, processor):
+        super(LazySupervisedDataset, self).__init__()
+        self.dataset = dataset
+        self.processor = processor
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __getitem__(self, i):
+        example = self.dataset[i]
+
+        # Format into conversation with proper image handling
+        def make_conversation_image(example):
+            if 'image_path' in example and example['image_path'] is not None:
+                images = []
+                for path in example['image_path']:
+                    try:
+                        img = PIL.Image.open(path).convert("RGB")
+                        images.append(img)
+                    except Exception as e:
+                        print(f"Error loading image {path}: {e}")
+                        # Use a placeholder 1x1 pixel image if loading fails
+                        images.append(PIL.Image.new('RGB', (1, 1), color=(128, 128, 128)))
+
+                return {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                *[{"type": "image", "image": img} for img in images],
+                                {"type": "text", "text": example["problem"]},
+                            ],
+                        },
+                        {
+                            "role": "assistant",
+                            "content": example["solution"],
+                        }
+                    ]
+                }
+            else:
+                return {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": example["problem"],
+                        },
+                        {
+                            "role": "assistant",
+                            "content": example["solution"],
+                        }
+                    ]
+                }
+
+        example_with_messages = make_conversation_image(example)
+        return example_with_messages
+
+
+def collate_fn(examples, processor):
+    """
+    Collate function for SFT training that properly handles multimodal inputs.
+    - Applies chat template to messages
+    - Processes images from conversations
+    - Creates proper input tensors with padding
+    - Generates loss-appropriate labels (ignoring padding and image tokens)
+    """
+    texts = [
+        processor.apply_chat_template(example["messages"], tokenize=False, add_generation_prompt=True)
+        for example in examples
+    ]
+
+    # Process images from the conversation
+    image_inputs = []
+    for example in examples:
+        images = []
+        for msg in example["messages"]:
+            if msg["role"] == "user" and isinstance(msg["content"], list):
+                for content_item in msg["content"]:
+                    if isinstance(content_item, dict) and content_item.get("type") == "image":
+                        images.append(content_item["image"])
+        image_inputs.append(images)
+
+    # Create batch with proper padding
+    batch = processor(
+        text=texts,
+        images=image_inputs,
+        return_tensors="pt",
+        padding=True,
+    )
+
+    # Create labels for loss computation (clone input_ids)
+    labels = batch["input_ids"].clone()
+
+    # Set padding tokens to -100 to ignore them in loss computation
+    if processor.tokenizer.pad_token_id is not None:
+        labels[labels == processor.tokenizer.pad_token_id] = -100
+
+    # Set image tokens to -100 in labels to ignore them in loss computation
+    image_token_id = None
+    if hasattr(processor.tokenizer, "convert_tokens_to_ids") and hasattr(processor, "image_token"):
+        try:
+            image_token_id = processor.tokenizer.convert_tokens_to_ids(processor.image_token)
+        except:
+            # Fall back to checking if image_token_id is directly accessible
+            image_token_id = getattr(processor, "image_token_id", None)
+
+    if image_token_id is not None:
+        labels[labels == image_token_id] = -100
+
+    batch["labels"] = labels
+    return batch
+
+
 def main(script_args, training_args, model_args):
+    # Save original output directory if doing SFT + GRPO
+    original_output_dir = training_args.output_dir
+
     # Load the VLM module
     vlm_module_cls = get_vlm_module(model_args.model_name_or_path)
     print("using vlm module:", vlm_module_cls.__name__)
@@ -1027,6 +1150,206 @@ def main(script_args, training_args, model_args):
 
     dataset = Dataset.from_list(all_data)
 
+    # Split dataset for validation if requested
+    splits = {"train": dataset}
+    if script_args.val_split_ratio > 0:
+        train_val_split = dataset.train_test_split(test_size=script_args.val_split_ratio)
+        splits["train"] = train_val_split["train"]
+        splits["validation"] = train_val_split["test"]
+
+    # Run SFT training first if requested
+    sft_model_path = model_args.model_name_or_path
+    if hasattr(script_args, 'run_sft') and script_args.run_sft:
+        print(f"\n{'='*20} STARTING SFT TRAINING {'='*20}\n")
+
+        # Create a copy of the training args
+        sft_training_args_dict = copy.deepcopy(training_args.to_dict())
+
+        # Remove GRPO-specific parameters that aren't compatible with SFTConfig
+        grpo_specific_params = [
+            'max_prompt_length', 'max_completion_length', 'num_generations',
+            'num_iterations', 'beta', 'epsilon', 'epsilon_high', 'ds3_gather_for_generation',
+            'temperature', 'top_p', 'top_k', 'min_p', 'repetition_penalty',
+            'cache_implementation', 'use_vllm', 'vllm_device', 'vllm_gpu_memory_utilization',
+            'vllm_dtype', 'vllm_max_model_len', 'vllm_enable_prefix_caching',
+            'vllm_guided_decoding_regex', 'reward_weights', 'sync_ref_model',
+            'ref_model_mixup_alpha', 'ref_model_sync_steps', 'log_completions'
+        ]
+        for param in grpo_specific_params:
+            if param in sft_training_args_dict:
+                del sft_training_args_dict[param]
+
+        # Create new SFTConfig with filtered parameters
+        sft_training_args = SFTConfig(**sft_training_args_dict)
+
+        # Set SFT-specific parameters
+        sft_training_args.output_dir = f"{original_output_dir}_sft" if script_args.sft_output_dir is None else script_args.sft_output_dir
+        sft_training_args.num_train_epochs = script_args.sft_num_train_epochs
+        sft_training_args.learning_rate = script_args.sft_learning_rate
+        sft_training_args.per_device_train_batch_size = script_args.sft_per_device_train_batch_size
+
+        # Initialize processor for SFT, using vision language model
+        processor = AutoProcessor.from_pretrained(
+            model_args.model_name_or_path, trust_remote_code=model_args.trust_remote_code
+        )
+
+        # Important: Set padding_side to 'left' for Flash Attention compatibility with Qwen2.5-VL
+        if hasattr(processor, "padding_side"):
+            processor.padding_side = "left"
+        if hasattr(processor, "tokenizer") and hasattr(processor.tokenizer, "padding_side"):
+            processor.tokenizer.padding_side = "left"
+        print(f"Setting padding_side to 'left' for Flash Attention compatibility")
+
+        # Ensure padding token is properly set to avoid errors during training
+        if hasattr(processor, "pad_token") and processor.pad_token is None:
+            if processor.eos_token is not None:
+                processor.pad_token = processor.eos_token
+                print(f"Set processor pad_token to eos_token: {processor.pad_token}")
+            else:
+                print("Warning: processor has no pad_token or eos_token")
+        elif hasattr(processor.tokenizer, "pad_token") and processor.tokenizer.pad_token is None:
+            if processor.tokenizer.eos_token is not None:
+                processor.tokenizer.pad_token = processor.tokenizer.eos_token
+                print(f"Set tokenizer pad_token to eos_token: {processor.tokenizer.pad_token}")
+            else:
+                print("Warning: tokenizer has no pad_token or eos_token")
+
+        # Prepare SFT dataset
+        sft_dataset = LazySupervisedDataset(splits["train"], processor)
+        sft_val_dataset = LazySupervisedDataset(splits["validation"], processor) if "validation" in splits else None
+
+        # Initialize the SFT model
+        torch_dtype = (
+            model_args.torch_dtype if model_args.torch_dtype in ["auto", None] else getattr(torch, model_args.torch_dtype)
+        )
+
+        model_kwargs = dict(
+            revision=model_args.model_revision,
+            trust_remote_code=model_args.trust_remote_code,
+            attn_implementation=model_args.attn_implementation,
+            torch_dtype=torch_dtype,
+            use_cache=False if sft_training_args.gradient_checkpointing else True,
+        )
+
+        print(f"Initializing model with dtype: {torch_dtype}, attn_implementation: {model_args.attn_implementation}")
+
+        # Use VLM module class factory method to get the correct model class based on model name
+        model_class = vlm_module_cls.get_model_class(None, model_args.model_name_or_path, model_kwargs)
+        model = model_class.from_pretrained(
+            model_args.model_name_or_path,
+            **model_kwargs
+        )
+
+        # Create custom collate function closure with the current processor
+        def create_collate_fn(processor):
+            def custom_collate_fn(examples):
+                return collate_fn(examples, processor)
+
+            return custom_collate_fn
+
+        # Create the PEFT config for SFT, similar to what we do in GRPO
+        import peft
+
+        # Get the vision modules keywords from VLM module
+        vision_modules_keywords = vlm_module_cls().get_vision_modules_keywords()
+        print(f"Vision module keywords to exclude from LoRA: {vision_modules_keywords}")
+
+        # Function to find all linear modules excluding vision modules for LoRA
+        def find_all_linear_names(model, vision_modules_keywords):
+            cls = torch.nn.Linear
+            lora_module_names = set()
+            for name, module in model.named_modules():
+                # Skip vision modules
+                if any(keyword in name for keyword in vision_modules_keywords):
+                    continue
+                if isinstance(module, cls):
+                    lora_module_names.add(name)
+
+            # Remove embedding modules if needed - they're typically not included
+            modules_to_remove = []
+            for m in lora_module_names:
+                if "embed_tokens" in m:
+                    modules_to_remove.append(m)
+
+            for m in modules_to_remove:
+                lora_module_names.remove(m)
+
+            return list(lora_module_names)
+
+        # Create the PEFT config for LoRA
+        peft_config = None
+        if model_args.use_peft:
+            # Find target modules for LoRA
+            target_modules = find_all_linear_names(model, vision_modules_keywords)
+
+            # Create the LoRA config
+            peft_config = peft.LoraConfig(
+                task_type=peft.TaskType.CAUSAL_LM,
+                target_modules=target_modules,
+                inference_mode=False,
+                r=model_args.lora_r,
+                lora_alpha=model_args.lora_alpha,
+                lora_dropout=model_args.lora_dropout
+            )
+
+            print(f"LoRA will be applied to {len(target_modules)} modules")
+            print(f"LoRA config: r={model_args.lora_r}, alpha={model_args.lora_alpha}, dropout={model_args.lora_dropout}")
+
+        # Freeze vision modules if requested
+        if model_args.freeze_vision_modules:
+            print("Vision modules will be frozen during training")
+        else:
+            print("Vision modules will be trainable")
+
+        # Initialize the SFT Trainer
+        sft_training_args.dataset_kwargs = {
+            "skip_prepare_dataset": True,
+        }
+        sft_training_args.remove_unused_columns = False
+
+        # Log SFT training configuration
+        print(f"\nSFT Training Configuration:")
+        print(f"  - Output directory: {sft_training_args.output_dir}")
+        print(f"  - Learning rate: {sft_training_args.learning_rate}")
+        print(f"  - Batch size: {sft_training_args.per_device_train_batch_size}")
+        print(f"  - Epochs: {sft_training_args.num_train_epochs}")
+        print(f"  - Gradient checkpointing: {sft_training_args.gradient_checkpointing}")
+
+        sft_trainer = SFTTrainer(
+            model=model,
+            args=sft_training_args,
+            train_dataset=sft_dataset,
+            eval_dataset=sft_val_dataset,
+            processing_class=processor.tokenizer,
+            data_collator=create_collate_fn(processor),
+            peft_config=peft_config,
+        )
+
+        # Check for last checkpoint
+        last_checkpoint = None
+        if os.path.isdir(sft_training_args.output_dir):
+            last_checkpoint = get_last_checkpoint(sft_training_args.output_dir)
+
+        # Start SFT training
+        print("Starting SFT training...")
+        sft_trainer.train(resume_from_checkpoint=last_checkpoint)
+
+        # Save the SFT model
+        print(f"Saving SFT model to {sft_training_args.output_dir}")
+        sft_trainer.save_model(sft_training_args.output_dir)
+
+        # Use SFT model for GRPO training
+        sft_model_path = sft_training_args.output_dir
+        print(f"Using SFT model from {sft_model_path} for GRPO training")
+
+        # Update model_args.model_name_or_path to use the SFT model
+        model_args.model_name_or_path = sft_model_path
+
+        # Reset output directory to original for GRPO
+        training_args.output_dir = original_output_dir
+
+        print(f"\n{'='*20} STARTING GRPO TRAINING {'='*20}\n")
+
     def make_conversation_from_jsonl(example):
         if 'image_path' in example and example['image_path'] is not None:
             # Don't load image here, just store the path
@@ -1057,16 +1380,9 @@ def main(script_args, training_args, model_args):
             }
 
     # Map the conversations
-    dataset = dataset.map(make_conversation_from_jsonl, num_proc=8)
-
-    # Split dataset for validation if requested
-    splits = {'train': dataset}
-    if script_args.val_split_ratio > 0:
-        train_val_split = dataset.train_test_split(
-            test_size=script_args.val_split_ratio
-        )
-        splits['train'] = train_val_split['train']
-        splits['validation'] = train_val_split['test']
+    grpo_dataset = {'train': splits['train'].map(make_conversation_from_jsonl, num_proc=8)}
+    if 'validation' in splits:
+        grpo_dataset['validation'] = splits['validation'].map(make_conversation_from_jsonl, num_proc=8)
 
     # Select trainer class based on vlm_trainer argument
     trainer_cls = VLMGRPOTrainer
@@ -1078,8 +1394,8 @@ def main(script_args, training_args, model_args):
         reward_funcs=reward_funcs,
         args=training_args,
         vlm_module=vlm_module_cls(),
-        train_dataset=splits['train'],
-        eval_dataset=splits.get('validation') if training_args.eval_strategy != "no" else None,
+        train_dataset=grpo_dataset['train'],
+        eval_dataset=grpo_dataset.get('validation') if training_args.eval_strategy != "no" else None,
         peft_config=get_peft_config(model_args),
         freeze_vision_modules=model_args.freeze_vision_modules,
         attn_implementation=model_args.attn_implementation,
