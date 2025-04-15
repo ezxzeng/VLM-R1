@@ -1157,6 +1157,22 @@ def main(script_args, training_args, model_args):
         splits["train"] = train_val_split["train"]
         splits["validation"] = train_val_split["test"]
 
+    # Initialize processor
+    processor = AutoProcessor.from_pretrained(
+        model_args.model_name_or_path, trust_remote_code=model_args.trust_remote_code
+    )
+
+    if not hasattr(processor, "chat_template") or processor.chat_template is None:
+        processor.chat_template = question_prompt
+        print(f"Set processor.chat_template for GRPO to task type: {script_args.question_task_template}")
+
+    # Important: Set padding_side to 'left' for Flash Attention compatibility with Qwen2.5-VL
+    if hasattr(processor, "padding_side"):
+        processor.padding_side = "left"
+    if hasattr(processor, "tokenizer") and hasattr(processor.tokenizer, "padding_side"):
+        processor.tokenizer.padding_side = "left"
+    print(f"Setting padding_side to 'left' for Flash Attention compatibility")
+
     # Run SFT training first if requested
     if hasattr(script_args, 'run_sft') and script_args.run_sft:
         print(f"\n{'='*20} STARTING SFT TRAINING {'='*20}\n")
@@ -1182,32 +1198,6 @@ def main(script_args, training_args, model_args):
         sft_training_args.num_train_epochs = script_args.sft_num_train_epochs
         sft_training_args.learning_rate = script_args.sft_learning_rate
         sft_training_args.per_device_train_batch_size = script_args.sft_per_device_train_batch_size
-
-        # Initialize processor for SFT, using vision language model
-        processor = AutoProcessor.from_pretrained(
-            model_args.model_name_or_path, trust_remote_code=model_args.trust_remote_code
-        )
-
-        # Important: Set padding_side to 'left' for Flash Attention compatibility with Qwen2.5-VL
-        if hasattr(processor, "padding_side"):
-            processor.padding_side = "left"
-        if hasattr(processor, "tokenizer") and hasattr(processor.tokenizer, "padding_side"):
-            processor.tokenizer.padding_side = "left"
-        print(f"Setting padding_side to 'left' for Flash Attention compatibility")
-
-        # Ensure padding token is properly set to avoid errors during training
-        if hasattr(processor, "pad_token") and processor.pad_token is None:
-            if processor.eos_token is not None:
-                processor.pad_token = processor.eos_token
-                print(f"Set processor pad_token to eos_token: {processor.pad_token}")
-            else:
-                print("Warning: processor has no pad_token or eos_token")
-        elif hasattr(processor.tokenizer, "pad_token") and processor.tokenizer.pad_token is None:
-            if processor.tokenizer.eos_token is not None:
-                processor.tokenizer.pad_token = processor.tokenizer.eos_token
-                print(f"Set tokenizer pad_token to eos_token: {processor.tokenizer.pad_token}")
-            else:
-                print("Warning: tokenizer has no pad_token or eos_token")
 
         # Prepare SFT dataset
         sft_dataset = LazySupervisedDataset(splits["train"], processor)
@@ -1375,6 +1365,7 @@ def main(script_args, training_args, model_args):
         reward_funcs=reward_funcs,
         args=training_args,
         vlm_module=vlm_module_cls(),
+        processing_class=processor,
         train_dataset=grpo_dataset['train'],
         eval_dataset=grpo_dataset.get('validation') if training_args.eval_strategy != "no" else None,
         peft_config=grpo_peft_config,
