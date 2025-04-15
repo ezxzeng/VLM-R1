@@ -27,12 +27,12 @@ warnings.filterwarnings("ignore", category=UserWarning, module="transformers")
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate model for object counting")
     parser.add_argument("--model_path", type=str, help="Path to the model checkpoint", default="/home/ezzeng/stat946_final_project/VLM-R1/src/open-r1-multimodal/output/Qwen2.5-VL-3B-GRPO-TALLY-lora-ratio-cntFormR/checkpoint-350")
-    parser.add_argument("--data_path", type=str, help="Path to the test data (JSONL)", default="/home/ezzeng/stat946_final_project/data/coco/val_qas_ratio_subset.jsonl")
-    parser.add_argument("--image_root", type=str, help="Path to image directory", default="/home/ezzeng/stat946_final_project/data")
-    parser.add_argument("--output_path", type=str, help="Path to save results", default="/home/ezzeng/stat946_final_project/logs/")
+    parser.add_argument("--data_path", type=str, help="Path to the test data (JSONL)", default="/home/ezzeng/stat946/stat946_final_proj/data/coco/val_qas_subset.jsonl")
+    parser.add_argument("--image_root", type=str, help="Path to image directory", default="/home/ezzeng/stat946/stat946_final_proj/data")
+    parser.add_argument("--output_path", type=str, help="Path to save results", default="/home/ezzeng/stat946/stat946_final_proj/logs/")
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size for evaluation")
     parser.add_argument("--num_samples", type=int, default=None, help="Number of samples to evaluate")
-    parser.add_argument("--segmentation_folder", type=str, help="Path to segmentation folder", default="/home/ezzeng/stat946_final_project/data/coco/segmentation_masks")
+    parser.add_argument("--segmentation_folder", type=str, help="Path to segmentation folder", default="/home/ezzeng/stat946/stat946_final_proj/data/coco/segmentation_masks")
     return parser.parse_args()
 
 def setup_distributed():
@@ -61,15 +61,10 @@ def load_jsonl(file_path, num_samples=None):
     
     return data
 
-def main():
-    args = parse_args()
-    # local_rank, world_size, rank = setup_distributed()
-    local_rank = 0
-    world_size = 1
-    rank = 0
+def main(args, local_rank=0, world_size=1, rank=0):
     device = f"cuda:{local_rank}"
     
-    output_dir = os.path.join(args.output_path, ("_").join(args.model_path.split("/")[:-2]))
+    output_dir = os.path.join(args.output_path, ("_").join(args.model_path.split("/")[-2:]))
     # Create output directory if it doesn't exist
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -83,6 +78,7 @@ def main():
         print(f"Streaming results will be written to {streaming_log_path}")
     
     # Load the base model first
+    print(args.model_path)
     model = Qwen2_5_VLForConditionalGeneration.from_pretrained(
         args.model_path,
         torch_dtype=torch.bfloat16,
@@ -114,7 +110,7 @@ def main():
         print(f"Processing {len(data)} examples across {world_size} processes")
     
     # Define the question template with think/answer instructions
-    QUESTION_TEMPLATE = "{Question} First output the thinking process in <think> </think> tags and then output the final answer in <answer> </answer> tags."
+    QUESTION_TEMPLATE = "First, count each instance you spot and their <x, y> coordinates as part of the thinking process in <think> </think> tags. Then output the final answer as a single number in <answer> </answer> tags. Below are some examples: \n <think>I spot a person at <401, 105>.\nI spot a person at <48, 19>.\nTherefore, I see 2 people.</think><answer>2</answer> \n <think>I spot an apple at <352, 258>.\nI spot an apple at <45, 351>.\nTherefore, I see 2 apples.</think><answer>2</answer> \n <think>I spot a pizza at <220, 421>.\nTherefore, I see 1 pizza.</think>\n<answer>1</answer> \n <think>I spot a cow at <118, 112>.\nI spot a cow at <143, 207>.\nI spot a cow at <356, 41>.\nTherefore, I see 3 cows.</think>\n<answer>3</answer>. \n {Question}."
     
     # Prepare messages for the model
     messages = []
@@ -238,4 +234,19 @@ def main():
     
 
 if __name__ == "__main__":
-    main() 
+    args = parse_args()
+
+    model_paths = [
+        "/pub5/ezzeng/stat946_final_project/output/Qwen2.5-VL-3B-GRPO-TALLY-lora-cntFormR-pointsR-segR-pointAccR-cntConsR-cntAccR/checkpoint-579",
+        "/pub5/ezzeng/stat946_final_project/output/Qwen2.5-VL-3B-GRPO-TALLY-lora-cntFormR-pointsR-pointAccR-cntConsR-cntAccR/checkpoint-579",
+        "/pub5/ezzeng/stat946_final_project/output/Qwen2.5-VL-3B-GRPO-TALLY-lora-cntFormR-pointsR-segR-cntConsR-cntAccR/checkpoint-579",
+        "/pub5/ezzeng/stat946_final_project/output/Qwen2.5-VL-3B-GRPO-TALLY-lora-cntFormR/checkpoint-579",
+        "/pub5/ezzeng/stat946_final_project/output/Qwen2.5-VL-3B-GRPO-TALLY-lora-cntConsR/checkpoint-579",
+        "/pub5/ezzeng/stat946_final_project/output/Qwen2.5-VL-3B-GRPO-TALLY-lora-cntFormR-segR/checkpoint-579",
+        "/pub5/ezzeng/stat946_final_project/output/Qwen2.5-VL-3B-GRPO-TALLY-lora-cntAccR/checkpoint-579",
+        "/pub5/ezzeng/stat946_final_project/output/Qwen2.5-VL-3B-GRPO-TALLY-lora-segR/checkpoint-579"
+    ]  
+
+    for model_path in model_paths:
+        args.model_path = model_path
+        main(args, local_rank=1)
