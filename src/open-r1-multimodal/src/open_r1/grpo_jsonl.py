@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 from babel.numbers import parse_decimal
 from open_r1.utils.math import compute_score
-from datasets import load_dataset, load_from_disk
+from datasets import load_dataset, load_from_disk, Dataset
 from transformers import Qwen2VLForConditionalGeneration
 
 from math_verify import parse, verify
@@ -939,10 +939,6 @@ def main(script_args, training_args, model_args):
     # Get reward functions
     reward_funcs = [reward_funcs_registry[func] for func in script_args.reward_funcs]
     print("reward_funcs:", reward_funcs)
-
-    # Load the JSONL datasets
-    import json
-    from datasets import Dataset
 
     data_files = script_args.data_file_paths.split(":")
     image_folders = script_args.image_folders.split(":")
