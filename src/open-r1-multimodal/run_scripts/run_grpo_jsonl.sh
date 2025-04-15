@@ -33,7 +33,7 @@ torchrun --nproc_per_node="2" \
     --model_name_or_path Qwen/Qwen2.5-VL-3B-Instruct \
     --deepspeed local_scripts/zero2.json \
     --dataset_name tally_qa \
-    --data_file_paths ../../../data/train_qas.jsonl \
+    --data_file_paths ../../../data/train_qas_subset.jsonl \
     --image_folders ../../../data \
     --max_prompt_length 1024 \
     --num_generations 4 \
