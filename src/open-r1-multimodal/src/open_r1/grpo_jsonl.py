@@ -1306,7 +1306,7 @@ def main(script_args, training_args, model_args):
 
         # Start SFT training
         print("Starting SFT training...")
-        sft_trainer.train(resume_from_checkpoint=last_checkpoint)
+        sft_trainer.train()
 
         # Save the SFT model
         print(f"Saving SFT model to {sft_training_args.output_dir}")
