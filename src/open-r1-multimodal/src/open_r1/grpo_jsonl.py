@@ -954,37 +954,37 @@ def main(script_args, training_args, model_args):
 
     all_data = []
     for data_file, image_folder, accu_reward_method in zip(data_files, image_folders, accu_reward_methods):
-        with open(data_file, "r") as f:
+        with open(data_file, 'r') as f:
             for line in f:
                 item = json.loads(line)
-                if "image" in item:
-                    if isinstance(item["image"], str):
+                if 'image' in item:
+                    if isinstance(item['image'], str):
                         # Store image path instead of loading the image
-                        item["image_path"] = [os.path.join(image_folder, item["image"])]
-                        del item["image"] # remove the image column so that it can be loaded later
-                    elif isinstance(item["image"], list):
+                        item['image_path'] = [os.path.join(image_folder, item['image'])]
+                        del item['image'] # remove the image column so that it can be loaded later
+                    elif isinstance(item['image'], list):
                         # if the image is a list, then it is a list of images (for multi-image input)
-                        item["image_path"] = [os.path.join(image_folder, image) for image in item["image"]]
-                        del item["image"] # remove the image column so that it can be loaded later
+                        item['image_path'] = [os.path.join(image_folder, image) for image in item['image']]
+                        del item['image'] # remove the image column so that it can be loaded later
                     else:
-                        raise ValueError(f"Unsupported image type: {type(item["image"])}")
+                        raise ValueError(f"Unsupported image type: {type(item['image'])}")
                 # Remove immediate image loading
-                item["problem"] = item["conversations"][0]["value"].replace("<image>", "")
+                item['problem'] = item['conversations'][0]['value'].replace('<image>', '')
 
                 # Handle solution that could be a float or string
-                solution_value = item["conversations"][1]["value"]
+                solution_value = item['conversations'][1]['value']
                 if isinstance(solution_value, str):
                     if "<think>" in solution_value:
                         # Preserve the original format with think and answer tags
-                        item["solution"] = solution_value
+                        item['solution'] = solution_value
                     else:
-                        item["solution"] = solution_value.replace("<answer>", "").replace("</answer>", "").strip()
+                        item['solution'] = solution_value.replace('<answer>', '').replace('</answer>', '').strip()
                 else:
                     # If it's a float or other non-string type, keep it as is
-                    item["solution"] = str(solution_value)
+                    item['solution'] = str(solution_value)
 
-                del item["conversations"]
-                item["accu_reward_method"] = item.get("accu_reward_method", accu_reward_method) # if accu_reward_method is in the data jsonl, use the value in the data jsonl, otherwise use the defined value
+                del item['conversations']
+                item['accu_reward_method'] = item.get('accu_reward_method', accu_reward_method) # if accu_reward_method is in the data jsonl, use the value in the data jsonl, otherwise use the defined value
                 all_data.append(item)
 
     dataset = Dataset.from_list(all_data)
