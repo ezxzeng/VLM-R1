@@ -1158,7 +1158,6 @@ def main(script_args, training_args, model_args):
         splits["validation"] = train_val_split["test"]
 
     # Run SFT training first if requested
-    sft_model_path = model_args.model_name_or_path
     if hasattr(script_args, 'run_sft') and script_args.run_sft:
         print(f"\n{'='*20} STARTING SFT TRAINING {'='*20}\n")
 
@@ -1338,14 +1337,8 @@ def main(script_args, training_args, model_args):
         print(f"Saving SFT model to {sft_training_args.output_dir}")
         sft_trainer.save_model(sft_training_args.output_dir)
 
-        # Use SFT model for GRPO training
-        sft_model_path = sft_training_args.output_dir
-        print(f"Using SFT model from {sft_model_path} for GRPO training")
-
-        # Update model_args.model_name_or_path to use the SFT model
-        model_args.model_name_or_path = sft_model_path
-
-        # Reset output directory to original for GRPO
+        # Reset to original for GRPO
+        model_args.model_name_or_path = sft_training_args.output_dir
         training_args.output_dir = original_output_dir
 
         print(f"\n{'='*20} STARTING GRPO TRAINING {'='*20}\n")
