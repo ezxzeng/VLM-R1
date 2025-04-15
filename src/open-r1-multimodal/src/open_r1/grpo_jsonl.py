@@ -56,7 +56,6 @@ from open_r1.qwen2_5vl_monkey_patch import monkey_patch_qwen2_5vl_flash_attn, mo
 monkey_patch_qwen2_5vl_flash_attn()
 
 
-
 tokenizer = None
 
 def initialize_tokenizer(model_path):
@@ -112,6 +111,45 @@ class GRPOScriptArguments(ScriptArguments):
             "help": "Choose reward method: 'default', 'mcp', ..."
         },
     )
+
+
+@dataclass
+class SFTScriptArguments(ScriptArguments):
+    """
+    Script arguments for the SFT training script.
+    """
+
+    image_root: str = field(default=None, metadata={"help": "The root directory of the image."})
+    dataset_train_split: str = field(default="train", metadata={"help": "The dataset split to use for training."})
+
+
+@dataclass
+class SFTGRPOScriptArguments(SFTScriptArguments, GRPOScriptArguments):
+    """
+    Combined script arguments for sequential SFT and GRPO training.
+    """
+
+    run_sft: bool = field(
+        default=True,
+        metadata={"help": "Whether to run SFT training before GRPO"},
+    )
+    sft_output_dir: str = field(
+        default=None,
+        metadata={"help": "Output directory for SFT model. If not set, it will use output_dir + '_sft'"},
+    )
+    sft_num_train_epochs: float = field(
+        default=3.0,
+        metadata={"help": "Number of training epochs for SFT"},
+    )
+    sft_learning_rate: float = field(
+        default=2e-5,
+        metadata={"help": "Learning rate for SFT"},
+    )
+    sft_per_device_train_batch_size: int = field(
+        default=4,
+        metadata={"help": "Batch size per device for SFT training"},
+    )
+
 
 def extract_choice(text):
     # 1. Clean and normalize text
@@ -1062,7 +1100,7 @@ def main(script_args, training_args, model_args):
 
 
 if __name__ == "__main__":
-    parser = TrlParser((GRPOScriptArguments, GRPOConfig, GRPOModelConfig))
+    parser = TrlParser((SFTGRPOScriptArguments, GRPOConfig, GRPOModelConfig))
     script_args, training_args, model_args = parser.parse_args_and_config()
     if training_args.deepspeed and "zero3" in training_args.deepspeed:
         print("zero3 is used, qwen2_5vl forward monkey patch is applied")

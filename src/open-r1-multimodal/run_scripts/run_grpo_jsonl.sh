@@ -56,4 +56,9 @@ torchrun --nproc_per_node="2" \
     --lora_dropout 0.05 \
     --lora_task_type CAUSAL_LM \
     --freeze_vision_modules true \
-    --reward_funcs format counting_format_reward points point_accuracy count_consistency counting_accuracy
+    --reward_funcs format counting_format_reward points point_accuracy count_consistency counting_accuracy \
+    --run_sft true \
+    --sft_output_dir output/$RUN_NAME/sft \
+    --sft_num_train_epochs 3.0 \
+    --sft_learning_rate 2e-5 \
+    --sft_per_device_train_batch_size 4
