@@ -1312,19 +1312,6 @@ def main(script_args, training_args, model_args):
         print(f"Saving SFT model to {sft_training_args.output_dir}")
         sft_trainer.save_model(sft_training_args.output_dir)
 
-        # Explicitly save the model configuration
-        model.config.model_type = "qwen2_5_vl"
-        model.config.to_json_file(os.path.join(sft_training_args.output_dir, "config.json"))
-        print(f"Saved config.json with model_type: {model.config.model_type}")
-
-        # copy preprocessor_config.json from the original model path to the output directory
-        import shutil
-        shutil.copy(
-            "/home/junf/.cache/huggingface/hub/models--Qwen--Qwen2.5-VL-3B-Instruct/blobs/7f3b746825e5eef53ed8ed57a91df9e86ee62c0a",
-            os.path.join(sft_training_args.output_dir, "preprocessor_config.json"),
-        )
-
-
         # Update model path for GRPO
         model_args.model_name_or_path = sft_training_args.output_dir
         training_args.output_dir = original_output_dir
