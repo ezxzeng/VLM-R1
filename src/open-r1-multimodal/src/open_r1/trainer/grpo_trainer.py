@@ -308,13 +308,13 @@ class VLMGRPOTrainer(Trainer):
                     # If we cannot find component in processing_class, return the processing_class itself
                     processing_component = getattr(processing_class, component, processing_class)
                     setattr(processing_component, processing_keyword, kwargs[processing_keyword])
-            if getattr(processing_class, "tokenizer",  None) is not None:
-                pad_token_id = processing_class.tokenizer.pad_token_id
-                processing_class.pad_token_id = pad_token_id
-                processing_class.eos_token_id = processing_class.tokenizer.eos_token_id
-            else:
-                assert isinstance(processing_class, PreTrainedTokenizerBase), "processing_class must be an instance of PreTrainedTokenizerBase if it has no tokenizer attribute"
-                pad_token_id = processing_class.pad_token_id
+        if getattr(processing_class, "tokenizer",  None) is not None:
+            pad_token_id = processing_class.tokenizer.pad_token_id
+            processing_class.pad_token_id = pad_token_id
+            processing_class.eos_token_id = processing_class.tokenizer.eos_token_id
+        else:
+            assert isinstance(processing_class, PreTrainedTokenizerBase), "processing_class must be an instance of PreTrainedTokenizerBase if it has no tokenizer attribute"
+            pad_token_id = processing_class.pad_token_id
 
         self.vlm_module.post_model_init(model, processing_class)
         self.vlm_module.post_model_init(self.ref_model, processing_class)
