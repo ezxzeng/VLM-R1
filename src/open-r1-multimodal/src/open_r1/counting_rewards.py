@@ -7,6 +7,7 @@ import math
 from scipy.optimize import linear_sum_assignment
 import os
 from datetime import datetime
+from pycocotools import mask as maskUtils
 
 
 def extract_coordinates(text):
@@ -265,6 +266,35 @@ def counting_accuracy_reward(completions, solution, **kwargs):
     
     return rewards
 
+
+def segmentation_reward(completions, solution, **kwargs):
+    """
+    Reward the model for correctly segmenting objects.
+    """
+    contents = [completion[0]["content"] for completion in completions]
+    rewards = []
+    for content, sol, segmentation_filepath in zip(contents, solution, kwargs.get("segmentation_path")):
+        gt_segmentation = np.load(segmentation_filepath)
+
+        model_points = extract_coordinates(extract_think_section(content))
+
+        instance_ids_hit = set()
+
+        # check if the model points are in the gt segmentation
+        for point in model_points:
+            if point[0] < 0 or point[0] >= gt_segmentation.shape[1] or point[1] < 0 or point[1] >= gt_segmentation.shape[0]:
+                continue
+            instance_id = gt_segmentation[point[1], point[0]]
+            if instance_id > 0: #ignore background
+                instance_ids_hit.add(instance_id)
+        
+        reward = len(instance_ids_hit) / gt_segmentation.max()
+        rewards.append(reward)
+
+    return rewards
+
+
+
 # def combined_counting_reward(completions, solution, **kwargs):
 #     """
 #     Combined reward function that balances all aspects of the counting task.
@@ -308,9 +338,10 @@ def counting_accuracy_reward(completions, solution, **kwargs):
 # Register all reward functions
 COUNTING_REWARD_FUNCS = {
     'points': points_reward,
-    'point_accuracy': point_accuracy_reward,
-    'count_consistency': count_consistency_reward,
-    'counting_accuracy': counting_accuracy_reward,
+    'point_accuracy': point_accuracy_reward, # pointing at right number of objects
+    'count_consistency': count_consistency_reward, # number of points same as final answer
+    'counting_accuracy': counting_accuracy_reward, # spacial accuracy of points
+    'segmentation_reward': segmentation_reward, # points landing on segmentation masks
     # 'combined_counting': combined_counting_reward,
-    'counting_format_reward': counting_format_reward,
+    'counting_format_reward': counting_format_reward, # format of the response
 } 
