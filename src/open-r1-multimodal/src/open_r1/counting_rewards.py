@@ -277,7 +277,13 @@ def segmentation_reward(completions, solution, **kwargs):
         gt_segmentation = np.load(segmentation_filepath)
 
         model_points = extract_coordinates(extract_think_section(content))
-
+        gt_points = extract_coordinates(extract_think_section(sol))
+        if gt_points[0][0]<1 and gt_points[0][0]>0:
+            # if the point is not an integer, then its a ratio of the height and width of the image
+            model_points = [
+                (int(point[0] * gt_segmentation.shape[1]), int(point[1] * gt_segmentation.shape[0]))
+                for point in model_points
+            ]
         instance_ids_hit = set()
 
         # check if the model points are in the gt segmentation
