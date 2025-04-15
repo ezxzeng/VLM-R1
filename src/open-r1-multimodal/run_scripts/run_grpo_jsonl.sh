@@ -19,10 +19,10 @@ export RUN_NAME="Qwen2.5-VL-3B-GRPO-TALLY-lora-count-many-examples-question-last
 export LOG_PATH="output/$RUN_NAME/debug_log.txt"
 if [[ $(hostname) != *"narval"* ]]; then
   export TORCH_DYNAMO=0
-  export CUDA_VISIBLE_DEVICES="1,2"
+  # export CUDA_VISIBLE_DEVICES="1,2"
 fi
 
-torchrun --nproc_per_node="1" \
+torchrun --nproc_per_node="2" \
     --nnodes="1" \
     --node_rank="0" \
     --master_addr="127.0.0.1" \
@@ -36,8 +36,8 @@ torchrun --nproc_per_node="1" \
     --data_file_paths ../../../data/train_qas.jsonl \
     --image_folders ../../../data \
     --max_prompt_length 1024 \
-    --num_generations 5 \
-    --per_device_train_batch_size 5 \
+    --num_generations 4 \
+    --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 2 \
     --logging_steps 1 \
     --bf16 \
