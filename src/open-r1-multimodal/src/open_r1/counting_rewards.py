@@ -13,7 +13,8 @@ from pycocotools import mask as maskUtils
 def extract_coordinates(text):
     """Extract all (x,y) coordinates from the think section"""
     coord_pattern = r'<\s*(\d+|\d*\.\d+)\s*,\s*(\d+|\d*\.\d+)\s*>'
-    return [(int(x), int(y)) for x, y in re.findall(coord_pattern, text)]
+    coords = re.findall(coord_pattern, text)
+    return [(float(x), float(y)) for x, y in coords]
 
 def extract_think_section(text):
     """Extract the thinking section from the response"""
@@ -107,22 +108,22 @@ def points_reward(completions, solution, **kwargs):
         # Extract points from both ground truth and model response
         think_section = extract_think_section(content)
         if not think_section:
-            return 0.0
-        
-        # Count points in the model response
-        points_count = count_objects_in_thinking(think_section)
-        
-        # Extract the expected count from the solution
-        gt_think_section = extract_think_section(sol)
-        gt_points_count = count_objects_in_thinking(gt_think_section)
+            reward = 0.0
+        else:
+            # Count points in the model response
+            points_count = count_objects_in_thinking(think_section)
+            
+            # Extract the expected count from the solution
+            gt_think_section = extract_think_section(sol)
+            gt_points_count = count_objects_in_thinking(gt_think_section)
 
-        
-        # # Calculate ratio of points found (capped at 1.0)
-        # ratio = min(1.0, points_count / gt_points_count)
-        
-        # return ratio
+            
+            # # Calculate ratio of points found (capped at 1.0)
+            # ratio = min(1.0, points_count / gt_points_count)
+            
+            # return ratio
 
-        reward = 1.0 - min(1.0, abs(points_count - gt_points_count) / gt_points_count)
+            reward = 1.0 - min(1.0, abs(points_count - gt_points_count) / gt_points_count)
         rewards.append(reward)
 
         if os.getenv("DEBUG_MODE") == "true":
@@ -290,7 +291,7 @@ def segmentation_reward(completions, solution, **kwargs):
         for point in model_points:
             if point[0] < 0 or point[0] >= gt_segmentation.shape[1] or point[1] < 0 or point[1] >= gt_segmentation.shape[0]:
                 continue
-            instance_id = gt_segmentation[point[1], point[0]]
+            instance_id = gt_segmentation[int(point[1]), int(point[0])]
             if instance_id > 0: #ignore background
                 instance_ids_hit.add(instance_id)
         

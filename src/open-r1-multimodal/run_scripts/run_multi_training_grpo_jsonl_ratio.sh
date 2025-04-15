@@ -19,8 +19,8 @@ torchrun --nproc_per_node="2" \
     --model_name_or_path Qwen/Qwen2.5-VL-3B-Instruct \
     --deepspeed local_scripts/zero2.json \
     --dataset_name tally_qa \
-    --data_file_paths /home/ezzeng/stat946/stat946_final_proj/data/coco/train_qas_ratio_subset.jsonl \
-    --image_folders /home/ezzeng/stat946/stat946_final_proj/data \
+    --data_file_paths /home/ezzeng/stat946_final_project/data/coco/train_qas_ratio_subset.jsonl \
+    --image_folders /home/ezzeng/stat946_final_project/data \
     --max_prompt_length 1024 \
     --num_generations 4 \
     --per_device_train_batch_size 2 \
@@ -42,7 +42,7 @@ torchrun --nproc_per_node="2" \
     --lora_dropout 0.05 \
     --lora_task_type CAUSAL_LM \
     --freeze_vision_modules true \
-    --segmentation_folder /home/ezzeng/stat946/stat946_final_proj/data/coco/segmentation_masks \
+    --segmentation_folder /home/ezzeng/stat946_final_project/data/coco/segmentation_masks \
     --reward_funcs format counting_format_reward points count_consistency counting_accuracy segmentation_reward point_accuracy
 
 
@@ -60,8 +60,8 @@ torchrun --nproc_per_node="2" \
     --model_name_or_path Qwen/Qwen2.5-VL-3B-Instruct \
     --deepspeed local_scripts/zero2.json \
     --dataset_name tally_qa \
-    --data_file_paths /home/ezzeng/stat946/stat946_final_proj/data/coco/train_qas_ratio_subset.jsonl \
-    --image_folders /home/ezzeng/stat946/stat946_final_proj/data \
+    --data_file_paths /home/ezzeng/stat946_final_project/data/coco/train_qas_ratio_subset.jsonl \
+    --image_folders /home/ezzeng/stat946_final_project/data \
     --max_prompt_length 1024 \
     --num_generations 4 \
     --per_device_train_batch_size 2 \
@@ -83,7 +83,7 @@ torchrun --nproc_per_node="2" \
     --lora_dropout 0.05 \
     --lora_task_type CAUSAL_LM \
     --freeze_vision_modules true \
-    --segmentation_folder /home/ezzeng/stat946/stat946_final_proj/data/coco/segmentation_masks \
+    --segmentation_folder /home/ezzeng/stat946_final_project/data/coco/segmentation_masks \
     --reward_funcs counting_format_reward segmentation_reward
 
 export RUN_NAME="Qwen2.5-VL-3B-GRPO-TALLY-lora-ratio-cntFormR"
@@ -100,8 +100,8 @@ torchrun --nproc_per_node="2" \
     --model_name_or_path Qwen/Qwen2.5-VL-3B-Instruct \
     --deepspeed local_scripts/zero2.json \
     --dataset_name tally_qa \
-    --data_file_paths /home/ezzeng/stat946/stat946_final_proj/data/coco/train_qas_ratio_subset.jsonl \
-    --image_folders /home/ezzeng/stat946/stat946_final_proj/data \
+    --data_file_paths /home/ezzeng/stat946_final_project/data/coco/train_qas_ratio_subset.jsonl \
+    --image_folders /home/ezzeng/stat946_final_project/data \
     --max_prompt_length 1024 \
     --num_generations 4 \
     --per_device_train_batch_size 2 \
@@ -123,7 +123,7 @@ torchrun --nproc_per_node="2" \
     --lora_dropout 0.05 \
     --lora_task_type CAUSAL_LM \
     --freeze_vision_modules true \
-    --segmentation_folder /home/ezzeng/stat946/stat946_final_proj/data/coco/segmentation_masks \
+    --segmentation_folder /home/ezzeng/stat946_final_project/data/coco/segmentation_masks \
     --reward_funcs counting_format_reward
 
 
@@ -141,8 +141,8 @@ torchrun --nproc_per_node="2" \
     --model_name_or_path Qwen/Qwen2.5-VL-3B-Instruct \
     --deepspeed local_scripts/zero2.json \
     --dataset_name tally_qa \
-    --data_file_paths /home/ezzeng/stat946/stat946_final_proj/data/coco/train_qas_ratio_subset.jsonl \
-    --image_folders /home/ezzeng/stat946/stat946_final_proj/data \
+    --data_file_paths /home/ezzeng/stat946_final_project/data/coco/train_qas_ratio_subset.jsonl \
+    --image_folders /home/ezzeng/stat946_final_project/data \
     --max_prompt_length 1024 \
     --num_generations 4 \
     --per_device_train_batch_size 2 \
@@ -164,7 +164,7 @@ torchrun --nproc_per_node="2" \
     --lora_dropout 0.05 \
     --lora_task_type CAUSAL_LM \
     --freeze_vision_modules true \
-    --segmentation_folder /home/ezzeng/stat946/stat946_final_proj/data/coco/segmentation_masks \
+    --segmentation_folder /home/ezzeng/stat946_final_project/data/coco/segmentation_masks \
     --reward_funcs points
 
 
@@ -182,8 +182,8 @@ torchrun --nproc_per_node="2" \
     --model_name_or_path Qwen/Qwen2.5-VL-3B-Instruct \
     --deepspeed local_scripts/zero2.json \
     --dataset_name tally_qa \
-    --data_file_paths /home/ezzeng/stat946/stat946_final_proj/data/coco/train_qas_ratio_subset.jsonl \
-    --image_folders /home/ezzeng/stat946/stat946_final_proj/data \
+    --data_file_paths /home/ezzeng/stat946_final_project/data/coco/train_qas_ratio_subset.jsonl \
+    --image_folders /home/ezzeng/stat946_final_project/data \
     --max_prompt_length 1024 \
     --num_generations 4 \
     --per_device_train_batch_size 2 \
@@ -205,7 +205,7 @@ torchrun --nproc_per_node="2" \
     --lora_dropout 0.05 \
     --lora_task_type CAUSAL_LM \
     --freeze_vision_modules true \
-    --segmentation_folder /home/ezzeng/stat946/stat946_final_proj/data/coco/segmentation_masks \
+    --segmentation_folder /home/ezzeng/stat946_final_project/data/coco/segmentation_masks \
     --reward_funcs segmentation_reward
 
 
@@ -223,8 +223,8 @@ torchrun --nproc_per_node="2" \
     --model_name_or_path Qwen/Qwen2.5-VL-3B-Instruct \
     --deepspeed local_scripts/zero2.json \
     --dataset_name tally_qa \
-    --data_file_paths /home/ezzeng/stat946/stat946_final_proj/data/coco/train_qas_ratio_subset.jsonl \
-    --image_folders /home/ezzeng/stat946/stat946_final_proj/data \
+    --data_file_paths /home/ezzeng/stat946_final_project/data/coco/train_qas_ratio_subset.jsonl \
+    --image_folders /home/ezzeng/stat946_final_project/data \
     --max_prompt_length 1024 \
     --num_generations 4 \
     --per_device_train_batch_size 2 \
@@ -246,7 +246,7 @@ torchrun --nproc_per_node="2" \
     --lora_dropout 0.05 \
     --lora_task_type CAUSAL_LM \
     --freeze_vision_modules true \
-    --segmentation_folder /home/ezzeng/stat946/stat946_final_proj/data/coco/segmentation_masks \
+    --segmentation_folder /home/ezzeng/stat946_final_project/data/coco/segmentation_masks \
     --reward_funcs point_accuracy
 
 
@@ -264,8 +264,8 @@ torchrun --nproc_per_node="2" \
     --model_name_or_path Qwen/Qwen2.5-VL-3B-Instruct \
     --deepspeed local_scripts/zero2.json \
     --dataset_name tally_qa \
-    --data_file_paths /home/ezzeng/stat946/stat946_final_proj/data/coco/train_qas_ratio_subset.jsonl \
-    --image_folders /home/ezzeng/stat946/stat946_final_proj/data \
+    --data_file_paths /home/ezzeng/stat946_final_project/data/coco/train_qas_ratio_subset.jsonl \
+    --image_folders /home/ezzeng/stat946_final_project/data \
     --max_prompt_length 1024 \
     --num_generations 4 \
     --per_device_train_batch_size 2 \
@@ -287,7 +287,7 @@ torchrun --nproc_per_node="2" \
     --lora_dropout 0.05 \
     --lora_task_type CAUSAL_LM \
     --freeze_vision_modules true \
-    --segmentation_folder /home/ezzeng/stat946/stat946_final_proj/data/coco/segmentation_masks \
+    --segmentation_folder /home/ezzeng/stat946_final_project/data/coco/segmentation_masks \
     --reward_funcs count_consistency
 
 
@@ -305,8 +305,8 @@ torchrun --nproc_per_node="2" \
     --model_name_or_path Qwen/Qwen2.5-VL-3B-Instruct \
     --deepspeed local_scripts/zero2.json \
     --dataset_name tally_qa \
-    --data_file_paths /home/ezzeng/stat946/stat946_final_proj/data/coco/train_qas_ratio_subset.jsonl \
-    --image_folders /home/ezzeng/stat946/stat946_final_proj/data \
+    --data_file_paths /home/ezzeng/stat946_final_project/data/coco/train_qas_ratio_subset.jsonl \
+    --image_folders /home/ezzeng/stat946_final_project/data \
     --max_prompt_length 1024 \
     --num_generations 4 \
     --per_device_train_batch_size 2 \
@@ -328,5 +328,5 @@ torchrun --nproc_per_node="2" \
     --lora_dropout 0.05 \
     --lora_task_type CAUSAL_LM \
     --freeze_vision_modules true \
-    --segmentation_folder /home/ezzeng/stat946/stat946_final_proj/data/coco/segmentation_masks \
+    --segmentation_folder /home/ezzeng/stat946_final_project/data/coco/segmentation_masks \
     --reward_funcs counting_accuracy
