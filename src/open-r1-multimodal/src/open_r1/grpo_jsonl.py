@@ -1077,7 +1077,7 @@ def collate_fn(examples, processor):
 
 
 def main(script_args, training_args, model_args):
-    # Save original output directory if doing SFT + GRPO
+    # Save original output directory for GRPO phase
     original_output_dir = training_args.output_dir
 
     # Load the VLM module
@@ -1161,10 +1161,8 @@ def main(script_args, training_args, model_args):
     if hasattr(script_args, 'run_sft') and script_args.run_sft:
         print(f"\n{'='*20} STARTING SFT TRAINING {'='*20}\n")
 
-        # Create a copy of the training args
+        # Create a copy of training args and remove GRPO-specific parameters
         sft_training_args_dict = copy.deepcopy(training_args.to_dict())
-
-        # Remove GRPO-specific parameters that aren't compatible with SFTConfig
         grpo_specific_params = [
             'max_prompt_length', 'max_completion_length', 'num_generations',
             'num_iterations', 'beta', 'epsilon', 'epsilon_high', 'ds3_gather_for_generation',
@@ -1180,8 +1178,6 @@ def main(script_args, training_args, model_args):
 
         # Create new SFTConfig with filtered parameters
         sft_training_args = SFTConfig(**sft_training_args_dict)
-
-        # Set SFT-specific parameters
         sft_training_args.output_dir = f"{original_output_dir}_sft" if script_args.sft_output_dir is None else script_args.sft_output_dir
         sft_training_args.num_train_epochs = script_args.sft_num_train_epochs
         sft_training_args.learning_rate = script_args.sft_learning_rate
@@ -1234,10 +1230,7 @@ def main(script_args, training_args, model_args):
 
         # Use VLM module class factory method to get the correct model class based on model name
         model_class = vlm_module_cls.get_model_class(None, model_args.model_name_or_path, model_kwargs)
-        model = model_class.from_pretrained(
-            model_args.model_name_or_path,
-            **model_kwargs
-        )
+        model = model_class.from_pretrained(model_args.model_name_or_path, **model_kwargs)
 
         # Create custom collate function closure with the current processor
         def create_collate_fn(processor):
@@ -1246,7 +1239,7 @@ def main(script_args, training_args, model_args):
 
             return custom_collate_fn
 
-        # Create the PEFT config for SFT, similar to what we do in GRPO
+        # Create PEFT config for SFT
         import peft
 
         # Get the vision modules keywords from VLM module
@@ -1263,13 +1256,7 @@ def main(script_args, training_args, model_args):
                     continue
                 if isinstance(module, cls):
                     lora_module_names.add(name)
-
-            # Remove embedding modules if needed - they're typically not included
-            modules_to_remove = []
-            for m in lora_module_names:
-                if "embed_tokens" in m:
-                    modules_to_remove.append(m)
-
+            modules_to_remove = [m for m in lora_module_names if "embed_tokens" in m]
             for m in modules_to_remove:
                 lora_module_names.remove(m)
 
@@ -1300,10 +1287,8 @@ def main(script_args, training_args, model_args):
         else:
             print("Vision modules will be trainable")
 
-        # Initialize the SFT Trainer
-        sft_training_args.dataset_kwargs = {
-            "skip_prepare_dataset": True,
-        }
+        # Initialize SFT Trainer
+        sft_training_args.dataset_kwargs = {"skip_prepare_dataset": True}
         sft_training_args.remove_unused_columns = False
 
         # Log SFT training configuration
@@ -1337,11 +1322,10 @@ def main(script_args, training_args, model_args):
         print(f"Saving SFT model to {sft_training_args.output_dir}")
         sft_trainer.save_model(sft_training_args.output_dir)
 
-        # Reset to original for GRPO
+        # Update model path for GRPO
         model_args.model_name_or_path = sft_training_args.output_dir
         training_args.output_dir = original_output_dir
-
-        print(f"\n{'='*20} STARTING GRPO TRAINING {'='*20}\n")
+        print(f"Transitioning to GRPO with model path: {model_args.model_name_or_path}")
 
     def make_conversation_from_jsonl(example):
         if 'image_path' in example and example['image_path'] is not None:
@@ -1380,8 +1364,12 @@ def main(script_args, training_args, model_args):
     # Select trainer class based on vlm_trainer argument
     trainer_cls = VLMGRPOTrainer
     print("using trainer:", trainer_cls.__name__)
-    initialize_tokenizer(model_args.model_name_or_path)
-    # Initialize the GRPO trainer
+
+    # Reuse SFT PEFT config if applicable, otherwise use model_args config
+    grpo_peft_config = peft_config if model_args.use_peft and peft_config else get_peft_config(model_args)
+    if grpo_peft_config:
+        print(f"GRPO PEFT config: {grpo_peft_config}")
+
     trainer = trainer_cls(
         model=model_args.model_name_or_path,
         reward_funcs=reward_funcs,
@@ -1389,7 +1377,7 @@ def main(script_args, training_args, model_args):
         vlm_module=vlm_module_cls(),
         train_dataset=grpo_dataset['train'],
         eval_dataset=grpo_dataset.get('validation') if training_args.eval_strategy != "no" else None,
-        peft_config=get_peft_config(model_args),
+        peft_config=grpo_peft_config,
         freeze_vision_modules=model_args.freeze_vision_modules,
         attn_implementation=model_args.attn_implementation,
         max_pixels=script_args.max_pixels,
