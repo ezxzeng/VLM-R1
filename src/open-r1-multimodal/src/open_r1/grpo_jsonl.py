@@ -113,6 +113,10 @@ class GRPOScriptArguments(ScriptArguments):
             "help": "Choose reward method: 'default', 'mcp', ..."
         },
     )
+    segmentation_folder: Optional[str] = field(
+        default=None,
+        metadata={"help": "Path to segmentation folder"},
+    )
 
 
 @dataclass
@@ -1146,6 +1150,9 @@ def main(script_args, training_args, model_args):
 
                 del item['conversations']
                 item['accu_reward_method'] = item.get('accu_reward_method', accu_reward_method) # if accu_reward_method is in the data jsonl, use the value in the data jsonl, otherwise use the defined value
+
+                if script_args.segmentation_folder is not None:
+                    item['segmentation_path'] = os.path.join(script_args.segmentation_folder, item['segmentation_path'])
                 all_data.append(item)
 
     dataset = Dataset.from_list(all_data)
@@ -1331,7 +1338,8 @@ def main(script_args, training_args, model_args):
                         *({'type': 'image', 'text': None} for _ in range(len(example['image_path']))),
                         {'type': 'text', 'text': question_prompt.format(Question=example['problem'])}
                     ]
-                }]
+                }],
+                'segmentation_path': example['segmentation_path'],
             }
         else:
             return {
@@ -1343,7 +1351,8 @@ def main(script_args, training_args, model_args):
                     'content': [
                         {'type': 'text', 'text': question_prompt.format(Question=example['problem'])}
                     ]
-                }]
+                }],
+                'segmentation_path': example['segmentation_path'],
             }
 
     # Map the conversations

@@ -15,7 +15,7 @@ fi
 
 export DEBUG_MODE="true"
 
-export RUN_NAME="Qwen2.5-VL-3B-GRPO-TALLY-lora-count-many-examples-question-last-cntFormR-pointsR-pointAccR-cntConsR-cntAccR"
+export RUN_NAME="Qwen2.5-VL-3B-GRPO-TALLY-lora-cntFormR-pointsR-segR-cntConsR-cntAccR"
 export LOG_PATH="output/$RUN_NAME/debug_log.txt"
 if [[ $(hostname) != *"narval"* ]]; then
   export TORCH_DYNAMO=0
@@ -33,10 +33,10 @@ torchrun --nproc_per_node="2" \
     --model_name_or_path Qwen/Qwen2.5-VL-3B-Instruct \
     --deepspeed local_scripts/zero2.json \
     --dataset_name tally_qa \
-    --data_file_paths /home/ezzeng/stat946/stat946_final_proj/data/train_qas.jsonl \
+    --data_file_paths /home/ezzeng/stat946/stat946_final_proj/data/coco/train_qas_subset.jsonl \
     --image_folders /home/ezzeng/stat946/stat946_final_proj/data \
     --max_prompt_length 1024 \
-    --num_generations 2 \
+    --num_generations 4 \
     --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 2 \
     --logging_steps 1 \
@@ -45,7 +45,7 @@ torchrun --nproc_per_node="2" \
     --data_seed 42 \
     --report_to wandb \
     --attn_implementation flash_attention_2 \
-    --num_train_epochs 2 \
+    --num_train_epochs 1 \
     --run_name $RUN_NAME \
     --save_steps 50 \
     --save_only_model true \
@@ -56,7 +56,8 @@ torchrun --nproc_per_node="2" \
     --lora_dropout 0.05 \
     --lora_task_type CAUSAL_LM \
     --freeze_vision_modules true \
-    --reward_funcs format counting_format_reward points point_accuracy count_consistency counting_accuracy \
+    --segmentation_folder /home/ezzeng/stat946/stat946_final_proj/data/coco/segmentation_masks \
+    --reward_funcs format counting_format_reward points count_consistency counting_accuracy segmentation_reward \
     --run_sft true \
     --sft_output_dir output/$RUN_NAME/sft \
     --sft_num_train_epochs 3.0 \

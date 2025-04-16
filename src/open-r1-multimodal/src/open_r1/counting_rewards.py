@@ -7,12 +7,14 @@ import math
 from scipy.optimize import linear_sum_assignment
 import os
 from datetime import datetime
+from pycocotools import mask as maskUtils
 
 
 def extract_coordinates(text):
     """Extract all (x,y) coordinates from the think section"""
     coord_pattern = r'<\s*(\d+|\d*\.\d+)\s*,\s*(\d+|\d*\.\d+)\s*>'
-    return [(int(x), int(y)) for x, y in re.findall(coord_pattern, text)]
+    coords = re.findall(coord_pattern, text)
+    return [(float(x), float(y)) for x, y in coords]
 
 def extract_think_section(text):
     """Extract the thinking section from the response"""
@@ -106,22 +108,22 @@ def points_reward(completions, solution, **kwargs):
         # Extract points from both ground truth and model response
         think_section = extract_think_section(content)
         if not think_section:
-            return 0.0
-        
-        # Count points in the model response
-        points_count = count_objects_in_thinking(think_section)
-        
-        # Extract the expected count from the solution
-        gt_think_section = extract_think_section(sol)
-        gt_points_count = count_objects_in_thinking(gt_think_section)
+            reward = 0.0
+        else:
+            # Count points in the model response
+            points_count = count_objects_in_thinking(think_section)
+            
+            # Extract the expected count from the solution
+            gt_think_section = extract_think_section(sol)
+            gt_points_count = count_objects_in_thinking(gt_think_section)
 
-        
-        # # Calculate ratio of points found (capped at 1.0)
-        # ratio = min(1.0, points_count / gt_points_count)
-        
-        # return ratio
+            
+            # # Calculate ratio of points found (capped at 1.0)
+            # ratio = min(1.0, points_count / gt_points_count)
+            
+            # return ratio
 
-        reward = 1.0 - min(1.0, abs(points_count - gt_points_count) / gt_points_count)
+            reward = 1.0 - min(1.0, abs(points_count - gt_points_count) / gt_points_count)
         rewards.append(reward)
 
         if os.getenv("DEBUG_MODE") == "true":
@@ -265,6 +267,41 @@ def counting_accuracy_reward(completions, solution, **kwargs):
     
     return rewards
 
+
+def segmentation_reward(completions, solution, **kwargs):
+    """
+    Reward the model for correctly segmenting objects.
+    """
+    contents = [completion[0]["content"] for completion in completions]
+    rewards = []
+    for content, sol, segmentation_filepath in zip(contents, solution, kwargs.get("segmentation_path")):
+        gt_segmentation = np.load(segmentation_filepath)
+
+        model_points = extract_coordinates(extract_think_section(content))
+        gt_points = extract_coordinates(extract_think_section(sol))
+        if gt_points[0][0]<1 and gt_points[0][0]>0:
+            # if the point is not an integer, then its a ratio of the height and width of the image
+            model_points = [
+                (int(point[0] * gt_segmentation.shape[1]), int(point[1] * gt_segmentation.shape[0]))
+                for point in model_points
+            ]
+        instance_ids_hit = set()
+
+        # check if the model points are in the gt segmentation
+        for point in model_points:
+            if point[0] < 0 or point[0] >= gt_segmentation.shape[1] or point[1] < 0 or point[1] >= gt_segmentation.shape[0]:
+                continue
+            instance_id = gt_segmentation[int(point[1]), int(point[0])]
+            if instance_id > 0: #ignore background
+                instance_ids_hit.add(instance_id)
+        
+        reward = len(instance_ids_hit) / gt_segmentation.max()
+        rewards.append(reward)
+
+    return rewards
+
+
+
 # def combined_counting_reward(completions, solution, **kwargs):
 #     """
 #     Combined reward function that balances all aspects of the counting task.
@@ -308,9 +345,10 @@ def counting_accuracy_reward(completions, solution, **kwargs):
 # Register all reward functions
 COUNTING_REWARD_FUNCS = {
     'points': points_reward,
-    'point_accuracy': point_accuracy_reward,
-    'count_consistency': count_consistency_reward,
-    'counting_accuracy': counting_accuracy_reward,
+    'point_accuracy': point_accuracy_reward, # pointing at right number of objects
+    'count_consistency': count_consistency_reward, # number of points same as final answer
+    'counting_accuracy': counting_accuracy_reward, # spacial accuracy of points
+    'segmentation_reward': segmentation_reward, # points landing on segmentation masks
     # 'combined_counting': combined_counting_reward,
-    'counting_format_reward': counting_format_reward,
+    'counting_format_reward': counting_format_reward, # format of the response
 } 
